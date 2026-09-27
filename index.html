@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Levykokoelma</title>
+  <style>
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body { font-family: Arial, sans-serif; margin: 0; padding: 16px; background: #111; color: #eee; }
+    h1 { color: #ffcc00; font-size: 1.6rem; margin: 0 0 12px; }
+    input, button, select, textarea { padding: 12px; margin: 5px 0; width: 100%; max-width: 100%; font-size: 16px; border-radius: 6px; border: 1px solid #444; background: #1a1a1a; color: #eee; }
+    .field-group { margin: 8px 0; }
+    .field-group > label { display: block; margin: 10px 0 2px; font-weight: bold; color: #eee; }
+    .price-row { display: flex; align-items: center; gap: 8px; max-width: 400px; }
+    .price-row input { flex: 1; width: auto; max-width: none; }
+    .price-unit { font-weight: bold; color: #ffcc00; }
+    .catalog-row { display: flex; flex-wrap: wrap; gap: 8px; max-width: 400px; }
+    .catalog-row > div { flex: 1 1 140px; min-width: 0; }
+    .catalog-row > div:last-child { flex: 0 1 150px; }
+    .catalog-row label { display: block; margin: 10px 0 2px; font-weight: bold; color: #eee; }
+    .catalog-row input { width: 100%; max-width: none; }
+    button { background: #ffcc00; color: black; border: none; font-weight: bold; cursor: pointer; min-height: 44px; }
+    .row-btns { display: flex; flex-wrap: wrap; gap: 8px; max-width: 100%; }
+    .row-btns button { width: auto; flex: 1 1 140px; }
+    .delete-btn { background: #ff4444; color: white; padding: 10px 12px; font-size: 15px; width: 100%; margin-top: 8px; }
+    #preview { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
+    .preview-item { position: relative; width: 110px; height: 110px; border: 2px solid #ffcc00; border-radius: 6px; overflow: hidden; background: #222; }
+    .preview-item img { width: 100%; height: 100%; object-fit: cover; }
+    .remove-image { position: absolute; top: 4px; right: 4px; background: #ff4444; color: white; border: none; padding: 2px 7px; font-size: 14px; cursor: pointer; border-radius: 3px; width: auto; min-height: 28px; }
+    .thumbnail { width: 100%; height: 200px; object-fit: cover; border-radius: 4px; }
+    .search { padding: 12px; width: 100%; max-width: 100%; font-size: 16px; }
+    .list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 16px; }
+    .card { background: #1f1f1f; padding: 12px; border-radius: 8px; }
+    .card img { width: 100%; border-radius: 4px; margin-bottom: 5px; }
+    .note { color: #aaa; font-size: 14px; max-width: 100%; }
+    @media (min-width: 640px) {
+      body { padding: 20px; }
+      input, button { max-width: 400px; }
+      .search { max-width: 500px; }
+      .list { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
+      .preview-item { width: 130px; height: 130px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Levykokoelma</h1>
+    <p class="note">Muutokset tallentuvat tämän selaimen muistiin. Ota välillä varmuuskopio napilla "Vie tiedot (JSON)".</p>
+
+    <input type="text" id="search" class="search" placeholder="Hae artistia tai albumia..." onkeyup="filterRecords()">
+
+    <h2 id="formHeading">Lisää uusi levy</h2>
+    <label for="imageInput">Kansikuvat</label>
+    <input type="file" id="imageInput" accept="image/*" multiple><br>
+    <div id="preview"></div>
+
+    <div class="field-group">
+      <label for="artist">Artisti / Esittäjä</label>
+      <input type="text" id="artist" placeholder="Pakollinen">
+    </div>
+    <div class="field-group">
+      <label for="album">Albumin nimi</label>
+      <input type="text" id="album" placeholder="Pakollinen">
+    </div>
+    <div class="field-group">
+      <label for="purchaseDate">Hankintapäivä</label>
+      <input type="date" id="purchaseDate">
+    </div>
+    <div class="field-group">
+      <label for="price">Ostohinta</label>
+      <div class="price-row">
+        <input type="number" id="price" placeholder="0,00" step="0.01">
+        <span class="price-unit">€</span>
+      </div>
+    </div>
+    <div class="field-group">
+      <div class="catalog-row">
+        <div>
+          <label for="catalogNumber">Kataloginumero</label>
+          <input type="text" id="catalogNumber" placeholder="">
+        </div>
+        <div>
+          <label for="country">Maa</label>
+          <input type="text" id="country" placeholder="esim. Suomi">
+        </div>
+      </div>
+    </div>
+    <div class="field-group">
+      <label for="condition">Kuntoluokitus</label>
+      <select id="condition">
+        <option value="">Valitse kunto</option>
+        <option value="M">M — Mint</option>
+        <option value="NM">NM — Near Mint</option>
+        <option value="EX">EX — Excellent</option>
+        <option value="VG+">VG+ — Very Good Plus</option>
+        <option value="VG">VG — Very Good</option>
+        <option value="G+">G+ — Good Plus</option>
+        <option value="G">G — Good</option>
+        <option value="F">F — Fair</option>
+        <option value="P">P — Poor</option>
+      </select>
+    </div>
+    <div class="field-group">
+      <label for="marketPrice">Markkinahinta / arvio</label>
+      <div class="price-row">
+        <input type="text" id="marketPrice" placeholder="esim. 25–45">
+        <span class="price-unit">€</span>
+      </div>
+    </div>
+    <div class="field-group">
+      <label for="notes">Lisätiedot</label>
+      <textarea id="notes" rows="4" placeholder="Lisätiedot"></textarea>
+    </div>
+
+    <button type="button" id="deleteBtn" class="delete-btn" style="display:none; max-width:400px;" onclick="deleteCurrentRecord()">Poista</button>
+
+    <div class="row-btns">
+      <button onclick="addRecord()">Lisää / Tallenna muokkaus</button>
+      <button onclick="exportData()">Vie tiedot (JSON)</button>
+      <button onclick="document.getElementById('importInput').click()">Lataa tiedot</button>
+    </div>
+    <input type="file" id="importInput" accept=".json" style="display:none" onchange="importData(event)">
+
+    <h2>Kokoelma (<span id="count">0</span> levyä)</h2>
+    <div id="collection" class="list"></div>
+  </div>
+
+  <script type="application/json" id="seed-data">[{"artist":"Ozzy Osbourne","album":"Speak of the Devil","purchaseDate":"","price":"16","images":["images/ozzy-osbourne-speak-of-the-devil-1.jpg","images/ozzy-osbourne-speak-of-the-devil-2.jpg"],"dateAdded":"20.6.2026","catalogNumber":"JETLP 401","country":"Eurooppa","condition":"","marketPrice":"30-55","notes":""},{"artist":"Ozzy Osbourne","album":"The Ultimate Sin","purchaseDate":"","price":"","images":["images/ozzy-osbourne-the-ultimate-sin-1.jpg","images/ozzy-osbourne-the-ultimate-sin-2.jpg"],"dateAdded":"20.6.2026","catalogNumber":"","country":"","condition":"","marketPrice":"","notes":""},{"artist":"Ozzy Osbourne","album":"Bark at the Moon","purchaseDate":"","price":"33","images":["images/ozzy-osbourne-bark-at-the-moon-1.jpg"],"dateAdded":"20.6.2026","catalogNumber":"","country":"","condition":"","marketPrice":"","notes":""},{"artist":"Ozzy Osbourne","album":"Diary of a Madman","purchaseDate":"","price":"","images":["images/ozzy-osbourne-diary-of-a-madman-1.jpg","images/ozzy-osbourne-diary-of-a-madman-2.jpg"],"dateAdded":"20.6.2026","catalogNumber":"","country":"","condition":"","marketPrice":"","notes":""},{"artist":"Ozzy Osbourne","album":"Blizzard of Ozz","purchaseDate":"","price":"","images":["images/ozzy-osbourne-diary-of-a-madman-2.jpg"],"dateAdded":"20.6.2026","catalogNumber":"","country":"","condition":"","marketPrice":"","notes":""},{"artist":"Ozzy Osbourne","album":"No Rest for the Wicked","purchaseDate":"","price":"","images":["images/ozzy-osbourne-no-rest-for-the-wicked-1.jpg"],"dateAdded":"25.9.2026","catalogNumber":"","country":"","condition":"","marketPrice":"","notes":""},{"artist":"Ozzy Osbourne","album":"Patient Number 9","purchaseDate":"","price":"","images":["images/ozzy-osbourne-patient-number-9-1.jpg"],"dateAdded":"25.9.2026","catalogNumber":"","country":"","condition":"","marketPrice":"","notes":""},{"artist":"Sade","album":"Promise","purchaseDate":"","price":"","images":["images/sade-promise-1.jpg"],"dateAdded":"25.9.2026","catalogNumber":"","country":"","condition":"","marketPrice":"","notes":""},{"artist":"Alice in Chains","album":"Dirt","purchaseDate":"","price":"","images":["images/alice-in-chains-dirt-1.jpg"],"dateAdded":"25.9.2026","catalogNumber":"","country":"","condition":"","marketPrice":"","notes":""},{"artist":"Eurythmics","album":"Revenge","purchaseDate":"","price":"","images":["images/eurythmics-revenge-1.jpg"],"dateAdded":"25.9.2026","catalogNumber":"","country":"","condition":"","marketPrice":"","notes":""},{"artist":"Dire Straits","album":"Brothers in Arms","purchaseDate":"","price":"","images":["images/dire-straits-brothers-in-arms-1.jpg"],"dateAdded":"25.9.2026","catalogNumber":"","country":"","condition":"","marketPrice":"","notes":""},{"artist":"Bad Religion","album":"Against the Grain","purchaseDate":"","price":"25","images":["images/bad-religion-against-the-grain-1.jpg","images/bad-religion-against-the-grain-2.jpg","images/bad-religion-against-the-grain-3.jpg"],"dateAdded":"26.9.2026","catalogNumber":"E-86409-1","country":"Yhdysvallat","condition":"","marketPrice":"25-45","notes":""},{"artist":"Sammal","album":"No 2","purchaseDate":"2026-09-26","price":"15","images":["images/sammal-no-2-1.jpg","images/sammal-no-2-2.jpg"],"dateAdded":"26.9.2026","catalogNumber":"SVR266","country":"Suomi","condition":"","marketPrice":"15-25","notes":""},{"artist":"Emmylou Harris","album":"Cimarron","purchaseDate":"2026-09-26","price":"8","images":["images/emmylou-harris-cimarron-1.jpg","images/emmylou-harris-cimarron-2.jpg","images/emmylou-harris-cimarron-3.jpg"],"dateAdded":"26.9.2026","catalogNumber":"WB 56955","country":"Saksa","condition":"","marketPrice":"5-15","notes":""},{"artist":"Fleetwood Mac","album":"The Collection","purchaseDate":"2026-09-26","price":"","images":["images/fleetwood-mac-the-collection-1.jpg","images/fleetwood-mac-the-collection-2.jpg","images/fleetwood-mac-the-collection-3.jpg"],"dateAdded":"26.9.2026","catalogNumber":"CCSLP 157","country":"Iso-Britannia","condition":"","marketPrice":"10-20","notes":""},{"artist":"Jimi Hendrix","album":"Isle Of Wight","purchaseDate":"2026-09-26","price":"","catalogNumber":"2482 577","country":"Hollanti","condition":"","marketPrice":"10-25","notes":"","dateAdded":"26.9.2026","images":["images/jimi-hendrix-isle-of-wight-1.jpg","images/jimi-hendrix-isle-of-wight-2.jpg"]},{"artist":"The B-52's","album":"Bouncing Off the Satellites","purchaseDate":"2026-09-26","price":"","catalogNumber":"ILPS 9871","country":"Iso-Britannia","condition":"","marketPrice":"10-25","notes":"","dateAdded":"26.9.2026","images":["images/the-b-52-s-bouncing-off-the-satellites-1.jpg","images/the-b-52-s-bouncing-off-the-satellites-2.jpg"]},{"artist":"Wendy Carlos","album":"A Clockwork Orange (Soundtrack)","purchaseDate":"2026-09-26","price":"","catalogNumber":"BS 2573","country":"Yhdysvallat","condition":"","marketPrice":"15-35","notes":"","dateAdded":"26.9.2026","images":["images/wendy-carlos-a-clockwork-orange-soundtrack-1.jpg","images/wendy-carlos-a-clockwork-orange-soundtrack-2.jpg"]},{"artist":"Spiritual Beggars","album":"Earth Blues","purchaseDate":"2026-09-26","price":"","catalogNumber":"SRE450LP","country":"Suomi","condition":"","marketPrice":"20-40","notes":"","dateAdded":"26.9.2026","images":["images/spiritual-beggars-earth-blues-1.jpg","images/spiritual-beggars-earth-blues-2.jpg"]},{"artist":"Helloween","album":"Keeper of the Seven Keys Part I","purchaseDate":"2026-09-26","price":"20","catalogNumber":"N 0057 / LP 08-4415","country":"Saksa","condition":"","marketPrice":"10-35","notes":"","dateAdded":"26.9.2026","images":["images/helloween-keeper-of-the-seven-keys-part-i-1.jpg","images/helloween-keeper-of-the-seven-keys-part-i-2.jpg"]},{"artist":"Fu Manchu","album":"Signs of Infinite Power","purchaseDate":"2026-09-26","price":"24","catalogNumber":"SRE696LPB1","country":"Suomi","condition":"","marketPrice":"24-35","notes":"","dateAdded":"26.9.2026","images":["images/fu-manchu-signs-of-infinite-power-1.jpg","images/fu-manchu-signs-of-infinite-power-2.jpg"]},{"artist":"Tuomari Nurmio","album":"Kuu","purchaseDate":"2026-09-26","price":"16","catalogNumber":"MGM 2015","country":"Suomi","condition":"","marketPrice":"15-30","notes":"","dateAdded":"26.9.2026","images":["images/tuomari-nurmio-kuu-1.jpg","images/tuomari-nurmio-kuu-2.jpg","images/tuomari-nurmio-kuu-3.jpg"]},{"artist":"The Cardigans","album":"Gran Turismo","purchaseDate":"2026-09-26","price":"","catalogNumber":"060255722170","country":"EU","condition":"","marketPrice":"20-35","notes":"","dateAdded":"26.9.2026","images":["images/the-cardigans-gran-turismo-1.jpg","images/the-cardigans-gran-turismo-2.jpg"]},{"artist":"Janis Joplin","album":"Joplin In Concert","purchaseDate":"2026-09-26","price":"15","catalogNumber":"S 67241","country":"Hollanti","condition":"","marketPrice":"8-25","notes":"","dateAdded":"26.9.2026","images":["images/janis-joplin-joplin-in-concert-1.jpg","images/janis-joplin-joplin-in-concert-2.jpg"]},{"artist":"Baroness","album":"Gold & Grey","purchaseDate":"2026-09-26","price":"","catalogNumber":"ABXN006-1","country":"Yhdysvallat","condition":"","marketPrice":"20-35","notes":"","dateAdded":"26.9.2026","images":["images/baroness-gold-grey-1.jpg","images/baroness-gold-grey-2.jpg"]},{"artist":"Baroness","album":"Stone","purchaseDate":"2026-09-26","price":"29.95","catalogNumber":"ABXN008-1","country":"Yhdysvallat","condition":"","marketPrice":"20-35","notes":"","dateAdded":"26.9.2026","images":["images/baroness-stone-1.jpg","images/baroness-stone-2.jpg"]},{"artist":"Baroness","album":"Purple","purchaseDate":"2026-09-26","price":"20","catalogNumber":"ABXN-001","country":"Yhdysvallat","condition":"","marketPrice":"25-40","notes":"","dateAdded":"26.9.2026","images":["images/baroness-purple-1.jpg","images/baroness-purple-2.jpg"]},{"artist":"Muddy Waters","album":"Live","purchaseDate":"2026-09-26","price":"10","catalogNumber":"RTS 113018","country":"EU","condition":"","marketPrice":"10-18","notes":"","dateAdded":"26.9.2026","images":["images/muddy-waters-live-1.jpg","images/muddy-waters-live-2.jpg"]},{"artist":"Gary Moore","album":"Wild Frontier","purchaseDate":"2026-09-26","price":"16","catalogNumber":"DIX 56","country":"Iso-Britannia","condition":"","marketPrice":"10-20","notes":"","dateAdded":"26.9.2026","images":["images/gary-moore-wild-frontier-1.jpg","images/gary-moore-wild-frontier-2.jpg"]},{"artist":"Nina Hagen Band","album":"Nina Hagen Band","purchaseDate":"2026-09-26","price":"13","catalogNumber":"CBS 83136","country":"Saksa","condition":"","marketPrice":"2-30","notes":"","dateAdded":"26.9.2026","images":["images/nina-hagen-band-nina-hagen-band-1.jpg","images/nina-hagen-band-nina-hagen-band-2.jpg"]},{"artist":"Kim Wilde","album":"Another Step","purchaseDate":"2026-09-26","price":"5","catalogNumber":"MCA-5903","country":"Yhdysvallat","condition":"","marketPrice":"3-20","notes":"","dateAdded":"26.9.2026","images":["images/kim-wilde-another-step-1.jpg","images/kim-wilde-another-step-2.jpg"]},{"artist":"Martti Servo & Napander","album":"Tulppa auki!","purchaseDate":"2026-09-26","price":"25","images":["images/martti-servo-napander-tulppa-auki-1.jpg","images/martti-servo-napander-tulppa-auki-2.jpg"],"dateAdded":"26.9.2026","catalogNumber":"IMPALA 519 LP","country":"Suomi","condition":"","marketPrice":"30-35","notes":"Nimikirjoitukset, ostettu artistilta. Pyyntihinta 30 €."},{"artist":"Martti Servo & Napander","album":"Osuu ja uppoaa!","purchaseDate":"2026-09-26","price":"25","images":["images/martti-servo-napander-osuu-ja-uppoaa-1.jpg","images/martti-servo-napander-osuu-ja-uppoaa-2.jpg"],"dateAdded":"26.9.2026","catalogNumber":"IMPALA 523 LP","country":"Suomi","condition":"","marketPrice":"29-30","notes":"Nimikirjoitukset, ostettu artistilta. Pyyntihinta 30 €."},{"artist":"Nina Hagen","album":"NunSexMonkRock","purchaseDate":"2026-09-26","price":"","images":["images/nina-hagen-nunsexmonkrock-1.jpg","images/nina-hagen-nunsexmonkrock-2.jpg"],"dateAdded":"26.9.2026","catalogNumber":"CBS 85774","country":"Eurooppa","condition":"","marketPrice":"4-25","notes":""},{"artist":"Ozzy Osbourne","album":"Shot in the Dark (7\" single)","purchaseDate":"2026-09-26","price":"5","images":["images/ozzy-osbourne-shot-in-the-dark-7-single-1.jpg","images/ozzy-osbourne-shot-in-the-dark-7-single-2.jpg"],"dateAdded":"26.9.2026","catalogNumber":"Epic A 6859","country":"Iso-Britannia","condition":"","marketPrice":"3-15","notes":""},{"artist":"Kate Bush","album":"Babooshka (7\" single)","purchaseDate":"2026-09-26","price":"8","images":["images/kate-bush-babooshka-7-single-1.jpg","images/kate-bush-babooshka-7-single-2.jpg"],"dateAdded":"26.9.2026","catalogNumber":"EMI Electrola 1 C 006-07 321","country":"Saksa","condition":"","marketPrice":"2-15","notes":"Levy hyvässä kunnossa, kannessa mustekynämerkintä."},{"artist":"Mastodon","album":"The Hunter","purchaseDate":"2026-09-26","price":"17.99","images":["images/mastodon-the-hunter-1.jpg","images/mastodon-the-hunter-2.jpg"],"dateAdded":"26.9.2026","catalogNumber":"528158-1","country":"Yhdysvallat","condition":"","marketPrice":"20-35","notes":""},{"artist":"Mastodon","album":"Call of the Mastodon","purchaseDate":"2026-09-26","price":"26.99","images":["images/mastodon-call-of-the-mastodon-1.jpg","images/mastodon-call-of-the-mastodon-2.jpg"],"dateAdded":"26.9.2026","catalogNumber":"RR 6515-1 / RR44741","country":"Yhdysvallat & Eurooppa","condition":"","marketPrice":"15-30","notes":"Custom Butterfly with Splatter -vinyyli"},{"artist":"Alice Cooper","album":"Welcome to My Nightmare","purchaseDate":"2026-09-26","price":"8","images":["images/alice-cooper-welcome-to-my-nightmare-1.jpg","images/alice-cooper-welcome-to-my-nightmare-2.jpg"],"dateAdded":"26.9.2026","catalogNumber":"ANCL 2011","country":"Iso-Britannia","condition":"","marketPrice":"10-25","notes":"Hieman naarmua (myyjän merkintä)."},{"artist":"Alice Cooper","album":"Alice Cooper's Greatest Hits","purchaseDate":"2026-09-26","price":"","images":["images/alice-cooper-alice-cooper-s-greatest-hits-1.jpg","images/alice-cooper-alice-cooper-s-greatest-hits-2.jpg"],"dateAdded":"26.9.2026","catalogNumber":"K56043","country":"Iso-Britannia","condition":"","marketPrice":"5-20","notes":""},{"artist":"Alice Cooper","album":"Killer","purchaseDate":"2026-09-26","price":"","images":["images/alice-cooper-killer-1.jpg","images/alice-cooper-killer-2.jpg"],"dateAdded":"26.9.2026","catalogNumber":"8122797167 / R1 532373","country":"Eurooppa","condition":"","marketPrice":"15-30","notes":""}]</script>
+  <script>
+    const DATA_VERSION = 23;
+
+    function normalizeKey(r) {
+      const artist = (r.artist || "").trim().toLowerCase()
+        .replace(/^ozzy$/, "ozzy osbourne");
+      let album = (r.album || "").trim().toLowerCase()
+        .replace(/\s+/g, " ")
+        .replace(/[’']/g, "'");
+      const aliases = {
+        "ultimate": "the ultimate sin",
+        "bark": "bark at the moon",
+        "diary": "diary of a madman",
+        "bliz": "blizzard of ozz",
+        "pat": "patient number 9",
+        "patient number9": "patient number 9",
+        "patient nr 9": "patient number 9",
+        "patient no 9": "patient number 9",
+        "patient no. 9": "patient number 9"
+      };
+      album = aliases[album] || album;
+      return artist + "\t" + album;
+    }
+
+    function dedupeKeepFirst(list) {
+      const seen = new Set();
+      const out = [];
+      (list || []).forEach(r => {
+        const k = normalizeKey(r);
+        if (seen.has(k)) return;
+        seen.add(k);
+        out.push(r);
+      });
+      return out;
+    }
+
+    const seed = JSON.parse(document.getElementById("seed-data").textContent);
+    const savedVersion = Number(localStorage.getItem("lpRecordsVersion") || 0);
+
+    // v23: built-in cover images are separate files (images/xxx.jpg) and the
+    // built-in data refers to them by relative path. localStorage stores only
+    // these short path strings. Older versions stored "seedimg:<hash>" references
+    // (v16-v22) or the full base64 data of built-in images; both are mapped to the
+    // new paths here. Photos added in the browser stay as (compressed) data URLs.
+    const LEGACY_IMAGE_REFS = {"seedimg:1fowndq_71111":"images/ozzy-osbourne-speak-of-the-devil-1.jpg","seedimg:1fs8kos_189023":"images/ozzy-osbourne-speak-of-the-devil-2.jpg","seedimg:c2zsqy_214287":"images/ozzy-osbourne-the-ultimate-sin-1.jpg","seedimg:2h3hw4_32947":"images/ozzy-osbourne-the-ultimate-sin-2.jpg","seedimg:14w790q_58371":"images/ozzy-osbourne-bark-at-the-moon-1.jpg","seedimg:1xa77in_214455":"images/ozzy-osbourne-diary-of-a-madman-1.jpg","seedimg:lef9dd_50603":"images/ozzy-osbourne-diary-of-a-madman-2.jpg","seedimg:ew1qby_41371":"images/ozzy-osbourne-no-rest-for-the-wicked-1.jpg","seedimg:vqy4l2_277499":"images/ozzy-osbourne-patient-number-9-1.jpg","seedimg:rvgwdd_513175":"images/sade-promise-1.jpg","seedimg:1x20vqc_74371":"images/alice-in-chains-dirt-1.jpg","seedimg:e4kfd6_658379":"images/eurythmics-revenge-1.jpg","seedimg:i9saux_337687":"images/dire-straits-brothers-in-arms-1.jpg","seedimg:a908tv_257707":"images/bad-religion-against-the-grain-1.jpg","seedimg:asaunt_62407":"images/bad-religion-against-the-grain-2.jpg","seedimg:ckifuh_105407":"images/bad-religion-against-the-grain-3.jpg","seedimg:1se43dj_37719":"images/sammal-no-2-1.jpg","seedimg:11mpa94_72447":"images/sammal-no-2-2.jpg","seedimg:1n23gwz_99459":"images/emmylou-harris-cimarron-1.jpg","seedimg:yfsuk1_104895":"images/emmylou-harris-cimarron-2.jpg","seedimg:171dc2n_103091":"images/emmylou-harris-cimarron-3.jpg","seedimg:14d7lp_134683":"images/fleetwood-mac-the-collection-1.jpg","seedimg:rdc4o3_93359":"images/fleetwood-mac-the-collection-2.jpg","seedimg:1kf7bbe_104947":"images/fleetwood-mac-the-collection-3.jpg","seedimg:1v38vum_42403":"images/jimi-hendrix-isle-of-wight-1.jpg","seedimg:1ix15ez_97583":"images/jimi-hendrix-isle-of-wight-2.jpg","seedimg:1hek6yh_76487":"images/the-b-52-s-bouncing-off-the-satellites-1.jpg","seedimg:1bkhgm8_93327":"images/the-b-52-s-bouncing-off-the-satellites-2.jpg","seedimg:17zl0wi_42131":"images/wendy-carlos-a-clockwork-orange-soundtrack-1.jpg","seedimg:uyfy2d_100375":"images/wendy-carlos-a-clockwork-orange-soundtrack-2.jpg","seedimg:1r7qqn_51387":"images/spiritual-beggars-earth-blues-1.jpg","seedimg:59kfv8_40339":"images/spiritual-beggars-earth-blues-2.jpg","seedimg:1cxzu55_96495":"images/helloween-keeper-of-the-seven-keys-part-i-1.jpg","seedimg:1tdzgqg_127235":"images/helloween-keeper-of-the-seven-keys-part-i-2.jpg","seedimg:1qp3nrv_109739":"images/fu-manchu-signs-of-infinite-power-1.jpg","seedimg:19cqjzb_88295":"images/fu-manchu-signs-of-infinite-power-2.jpg","seedimg:x36l75_79107":"images/tuomari-nurmio-kuu-1.jpg","seedimg:fyzhvn_87671":"images/tuomari-nurmio-kuu-2.jpg","seedimg:5p3pc3_78895":"images/tuomari-nurmio-kuu-3.jpg","seedimg:5r3eh6_75003":"images/the-cardigans-gran-turismo-1.jpg","seedimg:1ensf77_75047":"images/the-cardigans-gran-turismo-2.jpg","seedimg:oadbi1_185703":"images/janis-joplin-joplin-in-concert-1.jpg","seedimg:3ljul9_104175":"images/janis-joplin-joplin-in-concert-2.jpg","seedimg:ljiegk_184283":"images/baroness-gold-grey-1.jpg","seedimg:1692ehf_88099":"images/baroness-gold-grey-2.jpg","seedimg:wm7xqa_197487":"images/baroness-stone-1.jpg","seedimg:jd2w2a_109215":"images/baroness-stone-2.jpg","seedimg:cji7bl_179747":"images/baroness-purple-1.jpg","seedimg:x6w5de_60879":"images/baroness-purple-2.jpg","seedimg:zrsmur_107719":"images/muddy-waters-live-1.jpg","seedimg:1ixrwu2_120867":"images/muddy-waters-live-2.jpg","seedimg:sa4n8p_91555":"images/gary-moore-wild-frontier-1.jpg","seedimg:1vb6ymu_81203":"images/gary-moore-wild-frontier-2.jpg","seedimg:ije0fz_101151":"images/nina-hagen-band-nina-hagen-band-1.jpg","seedimg:1r63q65_111519":"images/nina-hagen-band-nina-hagen-band-2.jpg","seedimg:dw4g3m_96467":"images/kim-wilde-another-step-1.jpg","seedimg:18nhceq_58139":"images/kim-wilde-another-step-2.jpg","seedimg:umgmic_157943":"images/martti-servo-napander-tulppa-auki-1.jpg","seedimg:1h4njv5_104651":"images/martti-servo-napander-tulppa-auki-2.jpg","seedimg:1x5wn36_166223":"images/martti-servo-napander-osuu-ja-uppoaa-1.jpg","seedimg:139rdmn_105015":"images/martti-servo-napander-osuu-ja-uppoaa-2.jpg","seedimg:1c0kdzs_103931":"images/nina-hagen-nunsexmonkrock-1.jpg","seedimg:tb1w1t_100323":"images/nina-hagen-nunsexmonkrock-2.jpg","seedimg:z81ooe_43155":"images/ozzy-osbourne-shot-in-the-dark-7-single-1.jpg","seedimg:1ibsw2t_93371":"images/ozzy-osbourne-shot-in-the-dark-7-single-2.jpg","seedimg:145ar92_33055":"images/kate-bush-babooshka-7-single-1.jpg","seedimg:n93i8_106099":"images/kate-bush-babooshka-7-single-2.jpg","seedimg:1onvzsn_71255":"images/mastodon-the-hunter-1.jpg","seedimg:1odk8ws_118083":"images/mastodon-the-hunter-2.jpg","seedimg:1hj9l3v_128307":"images/mastodon-call-of-the-mastodon-1.jpg","seedimg:1jrrxvw_166835":"images/mastodon-call-of-the-mastodon-2.jpg","seedimg:lfel23_95195":"images/alice-cooper-welcome-to-my-nightmare-1.jpg","seedimg:ow8edy_129747":"images/alice-cooper-welcome-to-my-nightmare-2.jpg","seedimg:1y8jl30_103063":"images/alice-cooper-alice-cooper-s-greatest-hits-1.jpg","seedimg:mlda7a_161315":"images/alice-cooper-alice-cooper-s-greatest-hits-2.jpg","seedimg:gs8kss_33335":"images/alice-cooper-killer-1.jpg","seedimg:mrhbl6_68175":"images/alice-cooper-killer-2.jpg"};
+    function hashStr(str) {
+      let h = 0x811c9dc5;
+      for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+      return (h >>> 0).toString(36) + "_" + str.length;
+    }
+    function normalizeImage(u) {
+      if (typeof u !== "string" || !u) return null;
+      if (u.indexOf("seedimg:") === 0) return LEGACY_IMAGE_REFS[u] || null;
+      if (u.indexOf("data:") === 0) return LEGACY_IMAGE_REFS["seedimg:" + hashStr(u)] || u;
+      return u;
+    }
+    function normalizeImageList(imgs) {
+      const out = [];
+      (Array.isArray(imgs) ? imgs : []).forEach(u => {
+        const n = normalizeImage(u);
+        if (n && out.indexOf(n) < 0) out.push(n);
+      });
+      return out;
+    }
+    function normalizeRecordImages(r) {
+      if (r && typeof r === "object" && Array.isArray(r.images)) r.images = normalizeImageList(r.images);
+      return r;
+    }
+    function packForStorage(list) {
+      return list.map(r => Object.assign({}, r, { images: normalizeImageList(r.images) }));
+    }
+    function unpackFromStorage(list) {
+      return list.map(normalizeRecordImages);
+    }
+
+    // Shrink a photo (data URL) to at most maxDim px on the long side as JPEG so it
+    // fits in localStorage. Falls back to the original if the browser can't decode it.
+    function compressDataUrl(src, maxDim, quality) {
+      maxDim = maxDim || 1000; quality = quality || 0.75;
+      return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+            const w = Math.max(1, Math.round(img.naturalWidth * scale));
+            const h = Math.max(1, Math.round(img.naturalHeight * scale));
+            const c = document.createElement("canvas");
+            c.width = w; c.height = h;
+            const ctx = c.getContext("2d");
+            ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            const out = c.toDataURL("image/jpeg", quality);
+            resolve(out.length < src.length ? out : src);
+          } catch (e) { resolve(src); }
+        };
+        img.onerror = () => resolve(src);
+        img.src = src;
+      });
+    }
+    const COMPRESS_OVER = 300000; // chars (~220 kB)
+    async function compressLargeImages(list) {
+      for (const r of list) {
+        if (!r || !Array.isArray(r.images)) continue;
+        for (let i = 0; i < r.images.length; i++) {
+          const u = r.images[i];
+          if (typeof u === "string" && u.indexOf("data:image/") === 0 && u.length > COMPRESS_OVER) {
+            r.images[i] = await compressDataUrl(u);
+          }
+        }
+      }
+      return list;
+    }
+    function loadStored() {
+      let stored = [];
+      try { stored = JSON.parse(localStorage.getItem("lpRecords") || "[]") || []; } catch (e) { stored = []; }
+      if (!Array.isArray(stored)) stored = [];
+      return unpackFromStorage(stored);
+    }
+    let storageWarned = false;
+    function persist(list, writeVersion) {
+      try {
+        localStorage.setItem("lpRecords", JSON.stringify(packForStorage(list)));
+        if (writeVersion) localStorage.setItem("lpRecordsVersion", String(DATA_VERSION));
+        return true;
+      } catch (e) {
+        console.warn("localStorage save failed", e);
+        if (!storageWarned) {
+          storageWarned = true;
+          alert("Selaimen tallennustila on täynnä, muutoksia ei voitu tallentaa pysyvästi. Vie tiedot (JSON) varmuuskopioksi.");
+        }
+        return false;
+      }
+    }
+
+    function withDefaults(r) {
+      if (r && typeof r === "object") {
+        if (typeof r.country !== "string") r.country = "";
+        if (typeof r.notes !== "string") r.notes = "";
+      }
+      return r;
+    }
+
+    // Keep the browser's (user-edited) records first; only fill in fields that are
+    // missing from them (e.g. the new "country") from the seed, and append seed
+    // albums the browser doesn't have yet. User-set condition, prices, catalog
+    // numbers, images etc. are never overwritten.
+    function mergeStoredWithSeed(stored, seedList) {
+      const seedByKey = new Map();
+      seedList.forEach(r => { const k = normalizeKey(r); if (!seedByKey.has(k)) seedByKey.set(k, r); });
+      const merged = dedupeKeepFirst(stored).map(r => {
+        const s = seedByKey.get(normalizeKey(r));
+        if (s) {
+          Object.keys(s).forEach(field => {
+            if (r[field] === undefined || r[field] === null) r[field] = s[field];
+          });
+          if ((!Array.isArray(r.images) || r.images.length === 0) && Array.isArray(s.images) && s.images.length) r.images = s.images.slice();
+          if ((r.country === undefined || r.country === null || r.country === "") && s.country) r.country = s.country;
+          if ((r.notes === undefined || r.notes === null || r.notes === "") && s.notes) r.notes = s.notes;
+          if ((r.price === undefined || r.price === null || r.price === "") && s.price !== undefined && s.price !== null && s.price !== "") r.price = s.price;
+        }
+        return r;
+      });
+      const have = new Set(merged.map(normalizeKey));
+      seedList.forEach(r => { if (!have.has(normalizeKey(r))) { merged.push(r); have.add(normalizeKey(r)); } });
+      return merged.map(withDefaults);
+    }
+
+    // Targeted per-record updates for browsers that already have the record in
+    // localStorage (the generic merge only fills missing/empty fields). Only
+    // overwrites a field if it is empty or still has the previous built-in value,
+    // so the user's own edits are kept.
+    function applyTargetedUpdates(list, fromVersion) {
+      const updates = [
+        { minVersion: 22, artist: "Ozzy Osbourne", album: "Speak of the Devil",
+          set: { catalogNumber: ["JETLP 401", [""]], country: ["Eurooppa", [""]],
+                 price: ["16", ["", "15"]], marketPrice: ["30-55", [""]] },
+          addImagesFromSeed: true }
+      ];
+      updates.forEach(u => {
+        if (fromVersion >= u.minVersion) return;
+        const key = normalizeKey(u);
+        const rec = list.find(r => normalizeKey(r) === key);
+        if (!rec) return;
+        Object.keys(u.set).forEach(field => {
+          const [value, replaceable] = u.set[field];
+          const cur = rec[field] === undefined || rec[field] === null ? "" : String(rec[field]).trim();
+          if (replaceable.indexOf(cur) >= 0) rec[field] = value;
+        });
+        if (u.addImagesFromSeed) {
+          const s = seed.find(r => normalizeKey(r) === key);
+          if (s && Array.isArray(s.images)) {
+            if (!Array.isArray(rec.images)) rec.images = [];
+            s.images.forEach(img => { if (rec.images.indexOf(img) < 0) rec.images.push(img); });
+          }
+        }
+      });
+    }
+
+    let records;
+    if (savedVersion < DATA_VERSION) {
+      const stored = loadStored();
+      records = mergeStoredWithSeed(stored, seed);
+      applyTargetedUpdates(records, savedVersion);
+      persist(records, true);
+    } else {
+      const stored = loadStored();
+      records = dedupeKeepFirst(stored.length ? stored : seed).map(withDefaults);
+      persist(records, false);
+    }
+
+    let editingIndex = -1;
+    let currentImages = [];
+
+    function readImage() {
+      const files = document.getElementById("imageInput").files;
+      Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = async e => {
+          const src = await compressDataUrl(e.target.result, 1000, 0.75);
+          currentImages.push(src);
+          addPreviewImage(src);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function addPreviewImage(src) {
+      const previewDiv = document.getElementById("preview");
+      const container = document.createElement("div");
+      container.className = "preview-item";
+      const img = document.createElement("img");
+      img.src = src;
+      const btn = document.createElement("button");
+      btn.className = "remove-image";
+      btn.type = "button";
+      btn.textContent = "×";
+      btn.onclick = function () {
+        container.remove();
+        currentImages = currentImages.filter(i => i !== src);
+      };
+      container.appendChild(img);
+      container.appendChild(btn);
+      previewDiv.appendChild(container);
+    }
+
+    document.getElementById("imageInput").onchange = readImage;
+
+    function save() {
+      records = dedupeKeepFirst(records);
+      persist(records, true);
+    }
+
+    function addRecord() {
+      const artist = document.getElementById("artist").value.trim();
+      const album = document.getElementById("album").value.trim();
+      const purchaseDate = document.getElementById("purchaseDate").value;
+      const price = document.getElementById("price").value;
+      const catalogNumber = document.getElementById("catalogNumber").value.trim();
+      const country = document.getElementById("country").value.trim();
+      const condition = document.getElementById("condition").value.trim();
+      const marketPrice = document.getElementById("marketPrice").value;
+      const notes = document.getElementById("notes").value;
+      if (!artist || !album) {
+        alert("Artisti ja albumin nimi ovat pakollisia!");
+        return;
+      }
+      const newRecord = {
+        artist,
+        album,
+        purchaseDate,
+        price,
+        catalogNumber,
+        country,
+        condition,
+        marketPrice,
+        notes,
+        images: currentImages.length > 0 ? currentImages.slice() : [],
+        dateAdded: new Date().toLocaleDateString("fi-FI")
+      };
+      if (editingIndex >= 0) {
+        records[editingIndex] = newRecord;
+        editingIndex = -1;
+      } else {
+        records.push(newRecord);
+      }
+      save();
+      renderCollection();
+      filterRecords();
+      resetForm();
+    }
+
+    function resetForm() {
+      document.getElementById("artist").value = "";
+      document.getElementById("album").value = "";
+      document.getElementById("purchaseDate").value = "";
+      document.getElementById("price").value = "";
+      document.getElementById("catalogNumber").value = "";
+      document.getElementById("country").value = "";
+      document.getElementById("condition").value = "";
+      document.getElementById("marketPrice").value = "";
+      document.getElementById("notes").value = "";
+      document.getElementById("preview").innerHTML = "";
+      currentImages = [];
+      document.getElementById("imageInput").value = "";
+      editingIndex = -1;
+      document.getElementById("deleteBtn").style.display = "none";
+      document.getElementById("formHeading").textContent = "Lisää uusi levy";
+    }
+
+    function editRecord(index) {
+      const r = records[index];
+      editingIndex = index;
+      document.getElementById("artist").value = r.artist;
+      document.getElementById("album").value = r.album;
+      document.getElementById("purchaseDate").value = r.purchaseDate || "";
+      document.getElementById("price").value = r.price || "";
+      document.getElementById("catalogNumber").value = r.catalogNumber || "";
+      document.getElementById("country").value = r.country || "";
+      document.getElementById("condition").value = r.condition || "";
+      document.getElementById("marketPrice").value = r.marketPrice || "";
+      document.getElementById("notes").value = r.notes || "";
+      const previewDiv = document.getElementById("preview");
+      previewDiv.innerHTML = "";
+      currentImages = r.images ? r.images.slice() : [];
+      currentImages.forEach(src => addPreviewImage(src));
+      document.getElementById("deleteBtn").style.display = "block";
+      document.getElementById("formHeading").textContent = "Muokkaa levyn";
+      window.scrollTo(0, 0);
+    }
+
+    function deleteRecord(index) {
+      if (confirm("Haluatko varmasti poistaa tämän levyn?")) {
+        records.splice(index, 1);
+        save();
+        renderCollection();
+        filterRecords();
+        resetForm();
+      }
+    }
+
+    function deleteCurrentRecord() {
+      if (editingIndex < 0) return;
+      deleteRecord(editingIndex);
+    }
+
+    function renderCollection(filteredRecords) {
+      if (!filteredRecords) filteredRecords = records;
+      const div = document.getElementById("collection");
+      div.innerHTML = filteredRecords.map(r => {
+        const index = records.indexOf(r);
+        const mainImage = r.images && r.images.length > 0 ? r.images[0] : null;
+        const img = mainImage
+          ? '<img src="' + mainImage + '" class="thumbnail" alt="">'
+          : '<p style="color:#666; text-align:center; padding:40px 0;">Ei kuvaa</p>';
+        return (
+          '<div class="card" onclick="editRecord(' + index + ')">' +
+            img +
+            "<strong>" + r.artist + "</strong><br>" +
+            r.album +
+          "</div>"
+        );
+      }).join("");
+      document.getElementById("count").textContent = filteredRecords.length;
+    }
+
+    function filterRecords() {
+      const term = document.getElementById("search").value.toLowerCase();
+      const filtered = records.filter(r =>
+        (r.artist || "").toLowerCase().includes(term) ||
+        (r.album || "").toLowerCase().includes(term) ||
+        (r.catalogNumber || "").toLowerCase().includes(term) ||
+        (r.country || "").toLowerCase().includes(term) ||
+        (r.condition || "").toLowerCase().includes(term) ||
+        (r.notes || "").toLowerCase().includes(term)
+      );
+      renderCollection(filtered);
+    }
+
+    function exportData() {
+      const dataStr = JSON.stringify(records, null, 2);
+      const dataUri = "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
+      const linkElement = document.createElement("a");
+      linkElement.setAttribute("href", dataUri);
+      linkElement.setAttribute("download", "levykokoelma-backup.json");
+      linkElement.click();
+    }
+
+    function importData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async function (e) {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (!Array.isArray(parsed)) throw new Error("not an array");
+          // Old backups contain base64 images: built-in ones map back to images/*.jpg,
+          // other large photos are shrunk so they fit in localStorage.
+          const list = dedupeKeepFirst(parsed).map(withDefaults).map(normalizeRecordImages);
+          await compressLargeImages(list);
+          records = list;
+          save();
+          renderCollection();
+          filterRecords();
+          alert("Tiedot ladattu onnistuneesti!");
+        } catch (err) {
+          alert("Virhe tiedoston lukemisessa!");
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = "";
+    }
+
+    renderCollection();
+  </script>
+</body>
+</html>
