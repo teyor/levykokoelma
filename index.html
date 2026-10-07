@@ -42,6 +42,13 @@
     .card { background: #1f1f1f; padding: 12px; border-radius: 8px; }
     .card img { width: 100%; border-radius: 4px; margin-bottom: 5px; }
     .note { color: #aaa; font-size: 14px; max-width: 100%; }
+    .form-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 20px 0 10px; }
+    .form-head h2 { margin: 0; flex: 1 1 auto; min-width: 0; }
+    .back-btn { width: auto; max-width: none; flex: 0 0 auto; margin: 0; padding: 8px 14px; min-height: 44px; background: transparent; color: #ffcc00; border: 2px solid #ffcc00; border-radius: 22px; font-size: 16px; font-weight: bold; white-space: nowrap; }
+    .back-btn:hover, .back-btn:focus-visible { background: #2a2a2a; outline: none; }
+    .back-btn:active { background: #ffcc00; color: #111; }
+    .back-btn[hidden] { display: none; }
+    .row-btns .back-btn { flex: 1 1 140px; border-radius: 6px; margin: 5px 0; }
     /* A–Ö letter jump bar (contacts style). Shown only while the full list is in view. */
     .list { padding-right: 30px; }
     .letter-bar { position: fixed; right: 2px; top: 50%; transform: translateY(-50%); z-index: 50; display: flex; flex-direction: column; align-items: stretch; width: 28px; height: min(calc(100vh - 24px), 784px); height: min(calc(100dvh - 24px), 784px); padding: 4px 0; margin: 0; background: rgba(26, 26, 26, 0.85); border: 1px solid #333; border-radius: 14px; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
@@ -71,7 +78,10 @@
       <button type="button" id="searchClear" class="search-clear" aria-label="Tyhjennä haku" title="Tyhjennä haku" hidden onpointerdown="event.preventDefault()" onmousedown="event.preventDefault()" onclick="clearSearch()">&times;</button>
     </div>
 
-    <h2 id="formHeading">Lisää uusi levy</h2>
+    <div class="form-head">
+      <h2 id="formHeading">Lisää uusi levy</h2>
+      <button type="button" id="backBtn" class="back-btn" hidden onclick="goBackFromEdit()">&larr; Takaisin</button>
+    </div>
     <label for="imageInput">Kansikuvat</label>
     <input type="file" id="imageInput" accept="image/*" multiple><br>
     <div id="preview"></div>
@@ -137,7 +147,8 @@
     <button type="button" id="deleteBtn" class="delete-btn" style="display:none; max-width:400px;" onclick="deleteCurrentRecord()">Poista</button>
 
     <div class="row-btns">
-      <button onclick="addRecord()">Lisää / Tallenna muokkaus</button>
+      <button type="button" id="backBtnBottom" class="back-btn" hidden onclick="goBackFromEdit()">&larr; Takaisin</button>
+      <button id="saveBtn" onclick="addRecord()">Lisää levy</button>
       <button onclick="exportData()">Vie tiedot (JSON)</button>
       <button onclick="document.getElementById('importInput').click()">Lataa tiedot</button>
     </div>
@@ -1035,7 +1046,8 @@
           .map(r => Number(r.copy) || 1);
         newRecord.copy = Math.max.apply(null, copies) + 1;
       }
-      if (editingIndex >= 0) {
+      const wasEditing = editingIndex >= 0;
+      if (wasEditing) {
         records[editingIndex] = newRecord;
         editingIndex = -1;
       } else {
@@ -1045,6 +1057,7 @@
       renderCollection();
       filterRecords();
       resetForm();
+      if (wasEditing) finishEdit(newRecord);
     }
 
     function resetForm() {
@@ -1063,10 +1076,15 @@
       editingIndex = -1;
       document.getElementById("deleteBtn").style.display = "none";
       document.getElementById("formHeading").textContent = "Lisää uusi levy";
+      document.getElementById("saveBtn").textContent = "Lisää levy";
+      document.getElementById("backBtn").hidden = true;
+      document.getElementById("backBtnBottom").hidden = true;
     }
 
     function editRecord(index) {
       const r = records[index];
+      if (editingIndex >= 0 && isFormDirty() && !confirm("Hylkäät tallentamattomat muutokset?")) return;
+      if (editingIndex < 0) editReturnScrollY = window.pageYOffset;
       editingIndex = index;
       document.getElementById("artist").value = r.artist;
       document.getElementById("album").value = r.album;
@@ -1082,17 +1100,97 @@
       currentImages = r.images ? r.images.slice() : [];
       currentImages.forEach(src => addPreviewImage(src));
       document.getElementById("deleteBtn").style.display = "block";
-      document.getElementById("formHeading").textContent = "Muokkaa levyn";
+      document.getElementById("formHeading").textContent = "Muokkaa levyn tietoja";
+      document.getElementById("saveBtn").textContent = "Tallenna muutokset";
+      document.getElementById("backBtn").hidden = false;
+      document.getElementById("backBtnBottom").hidden = false;
+      editSnapshot = formState();
+      if (!editHistoryPushed && window.history && history.pushState) {
+        history.pushState({ lpEdit: true }, "");
+        editHistoryPushed = true;
+      }
       window.scrollTo(0, 0);
     }
 
+    // ---- Leaving edit mode (back button, phone back gesture, after save) ----
+    let editSnapshot = null;
+    let editReturnScrollY = 0;
+    let editHistoryPushed = false;
+    let ignoreNextPop = false;
+    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+
+    function formState() {
+      return JSON.stringify(["artist", "album", "purchaseDate", "price", "catalogNumber", "country", "condition", "marketPrice", "notes"]
+        .map(id => document.getElementById(id).value).concat([currentImages]));
+    }
+    function isFormDirty() {
+      return editingIndex >= 0 && editSnapshot !== null && formState() !== editSnapshot;
+    }
+
+    // Drop our history entry without triggering the popstate handler.
+    function popEditHistory() {
+      if (editHistoryPushed) {
+        editHistoryPushed = false;
+        ignoreNextPop = true;
+        history.back();
+      }
+    }
+
+    // Return to the list at the record we came from (or the saved record).
+    function scrollBackToRecord(record) {
+      window.scrollTo(0, editReturnScrollY);
+      const idx = records.indexOf(record);
+      const card = idx >= 0 ? document.querySelector('#collection .card[data-idx="' + idx + '"]') : null;
+      if (card) {
+        const r = card.getBoundingClientRect();
+        if (r.top < 0 || r.bottom > window.innerHeight) {
+          window.scrollTo(0, Math.max(0, r.top + window.pageYOffset - Math.max(8, (window.innerHeight - r.height) / 2)));
+        }
+      }
+      editSnapshot = null;
+      updateLetterBarVisibility();
+    }
+
+    function exitEdit() {
+      const record = editingIndex >= 0 ? records[editingIndex] : null;
+      resetForm();
+      scrollBackToRecord(record);
+    }
+
+    function goBackFromEdit() {
+      if (editingIndex < 0) return;
+      if (isFormDirty() && !confirm("Hylkäät tallentamattomat muutokset?")) return;
+      exitEdit();
+      popEditHistory();
+    }
+
+    function finishEdit(record) {
+      scrollBackToRecord(record);
+      popEditHistory();
+    }
+
+    window.addEventListener("popstate", () => {
+      if (ignoreNextPop) { ignoreNextPop = false; return; }
+      if (!editHistoryPushed) return;
+      editHistoryPushed = false;
+      if (editingIndex < 0) return;
+      if (isFormDirty() && !confirm("Hylkäät tallentamattomat muutokset?")) {
+        history.pushState({ lpEdit: true }, "");
+        editHistoryPushed = true;
+        return;
+      }
+      exitEdit();
+    });
+
     function deleteRecord(index) {
       if (confirm("Haluatko varmasti poistaa tämän levyn?")) {
+        const wasEditing = editingIndex >= 0;
         records.splice(index, 1);
         save();
         renderCollection();
         filterRecords();
         resetForm();
+        if (wasEditing) finishEdit(null);
       }
     }
 
@@ -1129,7 +1227,7 @@
           ? '<img src="' + mainImage + '" class="thumbnail" alt="">'
           : '<p style="color:#666; text-align:center; padding:40px 0;">Ei kuvaa</p>';
         return (
-          '<div class="card"' + letterAttr + ' onclick="editRecord(' + index + ')">' +
+          '<div class="card"' + letterAttr + ' data-idx="' + index + '" onclick="editRecord(' + index + ')">' +
             img +
             "<strong>" + r.artist + "</strong><br>" +
             r.album +
