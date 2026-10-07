@@ -1078,8 +1078,22 @@
       deleteRecord(editingIndex);
     }
 
+    // Default display order: alphabetical by artist (leading "The " ignored),
+    // then by album. Finnish collation puts Å, Ä, Ö at the end. Sorting is
+    // display-only: the records array (and its indices) are left untouched.
+    const fiCollator = new Intl.Collator("fi", { sensitivity: "base", numeric: true });
+    function sortName(s) {
+      return String(s || "").trim().replace(/^the\s+/i, "");
+    }
+    function compareRecords(a, b) {
+      return fiCollator.compare(sortName(a.artist), sortName(b.artist)) ||
+        fiCollator.compare(String(a.artist || ""), String(b.artist || "")) ||
+        fiCollator.compare(String(a.album || ""), String(b.album || ""));
+    }
+
     function renderCollection(filteredRecords) {
       if (!filteredRecords) filteredRecords = records;
+      filteredRecords = filteredRecords.slice().sort(compareRecords);
       const div = document.getElementById("collection");
       div.innerHTML = filteredRecords.map(r => {
         const index = records.indexOf(r);
