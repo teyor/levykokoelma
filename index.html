@@ -1013,7 +1013,7 @@
     function addRecord() {
       const artist = document.getElementById("artist").value.trim();
       const album = document.getElementById("album").value.trim();
-      const purchaseDate = document.getElementById("purchaseDate").value;
+      let purchaseDate = document.getElementById("purchaseDate").value;
       const price = document.getElementById("price").value;
       const catalogNumber = document.getElementById("catalogNumber").value.trim();
       const country = document.getElementById("country").value.trim();
@@ -1024,7 +1024,11 @@
         alert("Artisti ja albumin nimi ovat pakollisia!");
         return;
       }
-      const newRecord = {
+      const prev = editingIndex >= 0 ? records[editingIndex] : null;
+      // Editing: keep the stored purchase date as-is unless the user changed it
+      // in the form (also keeps formats the date input can't display).
+      if (prev && purchaseDate === editPrefillPurchaseDate) purchaseDate = prev.purchaseDate || "";
+      const formFields = {
         artist,
         album,
         purchaseDate,
@@ -1034,10 +1038,13 @@
         condition,
         marketPrice,
         notes,
-        images: currentImages.length > 0 ? currentImages.slice() : [],
-        dateAdded: new Date().toLocaleDateString("fi-FI")
+        images: currentImages.length > 0 ? currentImages.slice() : []
       };
-      const prev = editingIndex >= 0 ? records[editingIndex] : null;
+      // Editing keeps the original dateAdded and any fields the form doesn't
+      // show; a new record gets today's date as before.
+      const newRecord = prev
+        ? Object.assign({}, prev, formFields, { dateAdded: prev.dateAdded || new Date().toLocaleDateString("fi-FI") })
+        : Object.assign(formFields, { dateAdded: new Date().toLocaleDateString("fi-FI") });
       if (prev && prev.copy) newRecord.copy = prev.copy;
       const clash = records.some((r, i) => i !== editingIndex && normalizeKey(r) === normalizeKey(newRecord));
       if (clash) {
@@ -1088,7 +1095,8 @@
       editingIndex = index;
       document.getElementById("artist").value = r.artist;
       document.getElementById("album").value = r.album;
-      document.getElementById("purchaseDate").value = r.purchaseDate || "";
+      editPrefillPurchaseDate = toIsoDate(r.purchaseDate);
+      document.getElementById("purchaseDate").value = editPrefillPurchaseDate;
       document.getElementById("price").value = r.price || "";
       document.getElementById("catalogNumber").value = r.catalogNumber || "";
       document.getElementById("country").value = r.country || "";
@@ -1114,6 +1122,15 @@
 
     // ---- Leaving edit mode (back button, phone back gesture, after save) ----
     let editSnapshot = null;
+    let editPrefillPurchaseDate = "";
+    // The date input needs YYYY-MM-DD; also accept Finnish d.m.yyyy.
+    function toIsoDate(s) {
+      s = String(s || "").trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      const m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+      if (m) return m[3] + "-" + m[2].padStart(2, "0") + "-" + m[1].padStart(2, "0");
+      return "";
+    }
     let editReturnScrollY = 0;
     let editHistoryPushed = false;
     let ignoreNextPop = false;
