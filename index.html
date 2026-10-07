@@ -30,6 +30,14 @@
     .remove-image { position: absolute; top: 4px; right: 4px; background: #ff4444; color: white; border: none; padding: 2px 7px; font-size: 14px; cursor: pointer; border-radius: 3px; width: auto; min-height: 28px; }
     .thumbnail { width: 100%; height: 200px; object-fit: cover; border-radius: 4px; }
     .search { padding: 12px; width: 100%; max-width: 100%; font-size: 16px; }
+    .search-wrap { position: relative; width: 100%; max-width: 100%; margin: 5px 0; }
+    .search-wrap .search { margin: 0; padding-right: 52px; max-width: none; }
+    .search::-webkit-search-cancel-button, .search::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
+    .search::-ms-clear { display: none; width: 0; height: 0; }
+    .search-clear { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); width: 44px; height: 44px; min-height: 44px; max-width: none; margin: 0; padding: 0; border: none; border-radius: 50%; background: transparent; color: #aaa; font-size: 26px; line-height: 44px; text-align: center; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+    .search-clear:hover, .search-clear:focus-visible { color: #ffcc00; background: #2a2a2a; outline: none; }
+    .search-clear:active { color: #111; background: #ffcc00; }
+    .search-clear[hidden] { display: none; }
     .list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 16px; }
     .card { background: #1f1f1f; padding: 12px; border-radius: 8px; }
     .card img { width: 100%; border-radius: 4px; margin-bottom: 5px; }
@@ -37,7 +45,8 @@
     @media (min-width: 640px) {
       body { padding: 20px; }
       input, button { max-width: 400px; }
-      .search { max-width: 500px; }
+      .search, .search-wrap { max-width: 500px; }
+      .search-wrap .search { max-width: none; }
       .list { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
       .preview-item { width: 130px; height: 130px; }
     }
@@ -48,7 +57,10 @@
     <h1>Levykokoelma</h1>
     <p class="note">Muutokset tallentuvat tämän selaimen muistiin. Ota välillä varmuuskopio napilla "Vie tiedot (JSON)".</p>
 
-    <input type="text" id="search" class="search" placeholder="Hae artistia tai albumia..." onkeyup="filterRecords()">
+    <div class="search-wrap">
+      <input type="search" id="search" class="search" placeholder="Hae artistia tai albumia..." autocomplete="off" enterkeyhint="search" oninput="filterRecords()" onkeydown="searchKeydown(event)">
+      <button type="button" id="searchClear" class="search-clear" aria-label="Tyhjennä haku" title="Tyhjennä haku" hidden onpointerdown="event.preventDefault()" onmousedown="event.preventDefault()" onclick="clearSearch()">&times;</button>
+    </div>
 
     <h2 id="formHeading">Lisää uusi levy</h2>
     <label for="imageInput">Kansikuvat</label>
@@ -1112,7 +1124,29 @@
       document.getElementById("count").textContent = filteredRecords.length;
     }
 
+    function updateSearchClear() {
+      const btn = document.getElementById("searchClear");
+      if (btn) btn.hidden = !document.getElementById("search").value;
+    }
+
+    // Clear the search box, show the whole collection and keep focus in the
+    // field so the on-screen keyboard stays open on mobile.
+    function clearSearch() {
+      const input = document.getElementById("search");
+      input.value = "";
+      filterRecords();
+      input.focus();
+    }
+
+    function searchKeydown(e) {
+      if (e.key === "Escape" || e.key === "Esc") {
+        e.preventDefault();
+        clearSearch();
+      }
+    }
+
     function filterRecords() {
+      updateSearchClear();
       const term = document.getElementById("search").value.toLowerCase();
       const filtered = records.filter(r =>
         (r.artist || "").toLowerCase().includes(term) ||
